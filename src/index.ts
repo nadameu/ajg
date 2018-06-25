@@ -1,11 +1,4 @@
-// ==UserScript==
-// @name        Solicitações de pagamento em bloco
-// @description Permite a criação de solicitações de pagamento em bloco
-// @namespace   http://nadameu.com.br/ajg
-// @include     /^https:\/\/eproc\.(trf4|jf(pr|rs|sc))\.jus\.br\/eproc(2trf4|V2)\/controlador\.php\?acao=nomeacoes_ajg_listar&/
-// @version     3
-// @grant       none
-// ==/UserScript==
+import './includes/estilos.scss';
 
 class ErroLinkCriarNaoExiste extends Error {
 	constructor() {
@@ -14,9 +7,11 @@ class ErroLinkCriarNaoExiste extends Error {
 }
 
 class Nomeacao {
-	idUnica: never;
-	numProcesso: never;
-	numeroNomeacao: never;
+	constructor(
+		public idUnica: string,
+		public numProcesso: string,
+		public numeroNomeacao: string
+	) {}
 }
 
 class Pagina {
@@ -24,44 +19,43 @@ class Pagina {
 	constructor(doc: Document) {
 		this.doc = doc;
 	}
-
-	static analisar(doc: Document) {
-		const classeAcao = {
-			nomeacoes_ajg_listar: PaginaNomeacoes,
-			criar_solicitacao_pagamento: PaginaCriar,
-		};
-		const acao = Pagina.parametros(doc).get('acao');
-		if (acao in classeAcao) return new classeAcao[acao](doc);
-		throw new Error('Página desconhecida.');
-	}
-
-	static parametros(doc: Document) {
-		return extrairParametrosUrl(doc.URL);
-	}
 }
 
 class PaginaCriar extends Pagina {
-	get formElement() {
-		return this.doc.getElementById(
-			'frmRequisicaoPagamentoAJG'
-		) as HTMLFormElement | null;
+	get formElement(): HTMLFormElement {
+		const form = this.doc.getElementById('frmRequisicaoPagamentoAJG');
+		if (!form) {
+			throw new Error('Formulário não encontrado.');
+		}
+		if (!form.matches('form')) {
+			throw new Error(
+				'Elemento #frmRequisicaoPagamentoAJG não é um formulário.'
+			);
+		}
+		return form as HTMLFormElement;
 	}
 }
 
 class PaginaNomeacoes extends Pagina {
-	get tabela() {
-		return this.doc.getElementById('tabelaNomAJG') as HTMLTableElement | null;
+	get tabela(): HTMLTableElement {
+		const tabela = this.doc.getElementById('tabelaNomAJG');
+		if (!tabela) {
+			throw new Error('Tabela não encontrada.');
+		}
+		if (!tabela.matches('table')) {
+			throw new Error('Elemento #tabelaNomAJG não é uma tabela.');
+		}
+		return tabela as HTMLTableElement;
 	}
 
 	adicionarAlteracoes() {
-		this.adicionarEstilos();
 		const aviso = this.adicionarAvisoCarregando();
 		this.adicionarFormulario()
 			.then(() => {
-				aviso.carregado = true;
+				aviso.setCarregado(true);
 			})
 			.catch(err => {
-				aviso.carregado = false;
+				aviso.setCarregado(false);
 				if (!(err instanceof ErroLinkCriarNaoExiste)) {
 					throw err;
 				}
@@ -85,10 +79,7 @@ class PaginaNomeacoes extends Pagina {
 		const timer = win.setInterval(update, 1000 / 3);
 		update();
 		return {
-			get carregado() {
-				return null;
-			},
-			set carregado(carregado) {
+			setCarregado(carregado: boolean) {
 				win.clearInterval(timer);
 				if (carregado) {
 					aviso.classList.add('gm-ajg__aviso--carregado');
@@ -101,44 +92,33 @@ class PaginaNomeacoes extends Pagina {
 		};
 	}
 
-	adicionarEstilos() {
-		this.doc.querySelector('head').insertAdjacentHTML(
-			'beforeend',
-			`
-<style>
-.gm-ajg__aviso {}
-.gm-ajg__aviso--carregado {}
-.gm-ajg__aviso--nao-carregado { display: none; }
-.gm-ajg__lista { font-size: 1.2em; }
-.gm-ajg__lista__processo { float: left; margin-right: 3ex; }
-.gm-ajg__lista__resultado {}
-.gm-ajg__lista__resultado--ok { color: green; }
-.gm-ajg__lista__resultado--erro { color: red; }
-</style>
-		`
-		);
-	}
-
 	adicionarFormulario() {
 		const linkCriar = this.doc.querySelector<HTMLAnchorElement>(
 			'a[href^="controlador.php?acao=criar_solicitacao_pagamento&"]'
 		);
 		if (!linkCriar) return Promise.reject(new ErroLinkCriarNaoExiste());
 
-		const areaTelaD = this.doc.getElementById(
-			'divInfraAreaTelaD'
-		) as HTMLDivElement | null;
+		const areaTelaD = this.doc.getElementById('divInfraAreaTelaD');
+		if (!areaTelaD)
+			return Promise.reject(
+				new Error('Elemento #divInfraAreaTelaD não encontrado.')
+			);
 		areaTelaD.insertAdjacentHTML(
 			'beforeend',
 			'<div class="gm-ajg__div"></div>'
 		);
 		const div = this.doc.querySelector<HTMLDivElement>('.gm-ajg__div');
+		if (!div) {
+			return Promise.reject(
+				new Error('Elemento ".gm-ajg__div" não encontrado.')
+			);
+		}
 
 		div.innerHTML = '<label>Aguarde, carregando formulário...</label>';
 		return XHR.buscarDocumento(linkCriar.href).then(doc => {
 			div.textContent = '';
-			const paginaCriar = Pagina.analisar(doc);
-			const form = paginaCriar.formElement.cloneNode(true);
+			const paginaCriar = new PaginaCriar(doc);
+			const form = paginaCriar.formElement.cloneNode(true) as HTMLFormElement;
 			if (!this.validarFormularioExterno(form))
 				return Promise.reject(new Error('Formulário não foi validado!'));
 			div.textContent = 'Ok.';
@@ -169,19 +149,28 @@ class PaginaNomeacoes extends Pagina {
 </fieldset>
 <output class="gm-ajg__resultado"></output>
 			`;
-			const enviar = this.doc.querySelector('.gm-ajg__formulario__enviar');
+			const enviar = this.doc.querySelector<HTMLButtonElement>(
+				'.gm-ajg__formulario__enviar'
+			);
+			if (!enviar) {
+				return Promise.reject(
+					new Error('Elemento ".gm-ajg__formulario__enviar" não encontrado.')
+				);
+			}
 			enviar.addEventListener('click', this.onEnviarClicado.bind(this));
 			return Promise.resolve();
 		});
 	}
 
-	enviarFormulario(url, method, data) {
+	enviarFormulario(url: string, method: string, data: FormData) {
 		return XHR.buscarDocumento(url, method, data).then(doc => {
 			const validacao = doc.getElementById('txaInfraValidacao');
 			const excecoes = Array.from(doc.querySelectorAll('.infraExcecao'));
-			const tabelaErros = doc.querySelector('table[summary="Erro(s)"]');
+			const tabelaErros = doc.querySelector<HTMLTableElement>(
+				'table[summary="Erro(s)"]'
+			);
 			if (validacao) {
-				const match = validacao.textContent
+				const match = (validacao.textContent || '')
 					.trim()
 					.match(/^Solicitação de pagamento (\d+) criada$/);
 				if (match) {
@@ -192,11 +181,13 @@ class PaginaNomeacoes extends Pagina {
 				'Houve um erro ao tentar criar a solicitação!',
 				'',
 			]);
-			excecoes.forEach(excecao => msgsErro.add(excecao.textContent.trim()));
+			excecoes.forEach(excecao =>
+				msgsErro.add((excecao.textContent || '').trim())
+			);
 			if (tabelaErros) {
 				const tBodyRows = Array.from(tabelaErros.rows).slice(1);
 				tBodyRows
-					.map(linha => linha.cells[1].textContent.trim())
+					.map(linha => ((linha.cells[1] || {}).textContent || '').trim())
 					.forEach(msg => msgsErro.add(msg));
 			}
 			window.errorDoc = doc;
@@ -209,32 +200,33 @@ class PaginaNomeacoes extends Pagina {
 		});
 	}
 
-	nomeacaoFromLinha(linha) {
-		const nomeacao = new Nomeacao();
-		const linkCriar = linha.querySelector(
+	nomeacaoFromLinha(linha: HTMLTableRowElement) {
+		const linkCriar = linha.querySelector<HTMLAnchorElement>(
 			'a[href^="controlador.php?acao=criar_solicitacao_pagamento&"]'
 		);
 		if (linkCriar) {
-			const parametros = extrairParametrosUrl(linkCriar.href);
-			const idUnica = parametros.get('id_unica');
+			const parametros = new URL(linkCriar.href).searchParams;
+			const idUnica = parametros.get('id_unica') || '';
 			const [numProcesso] = idUnica.split('|').slice(1);
-			const numeroNomeacao = linha.cells[2].textContent.trim();
-			nomeacao.idUnica = idUnica;
-			nomeacao.numProcesso = numProcesso;
-			nomeacao.numeroNomeacao = numeroNomeacao;
+			const numeroNomeacao = ((linha.cells[2] || {}).textContent || '').trim();
+			return new Nomeacao(idUnica, numProcesso, numeroNomeacao);
 		}
-		return nomeacao;
+		return null;
 	}
 
 	onEnviarClicado() {
-		const form = this.doc.querySelector('.gm-ajg__formulario');
+		const form = this.doc.querySelector<HTMLFormElement>('.gm-ajg__formulario');
+		if (!form)
+			throw new Error('Elemento ".gm-ajg__formulario" não encontrado.');
 		const url = form.action;
 		const method = form.method;
 
 		const tabela = this.tabela;
 		const linhas = Array.from(tabela.rows).slice(1);
 		const linhasProcessosSelecionados = linhas.filter(linha => {
-			const checkbox = linha.querySelector('input[type="checkbox"]');
+			const checkbox = linha.querySelector<HTMLInputElement>(
+				'input[type="checkbox"]'
+			);
 			return checkbox && checkbox.checked;
 		});
 
@@ -277,18 +269,18 @@ class PaginaNomeacoes extends Pagina {
 				() =>
 					DEBUG
 						? new Promise((resolve, reject) => {
-								let timer;
+								let timer: number;
 								timer = this.doc.defaultView.setTimeout(() => {
 									this.doc.defaultView.clearTimeout(timer);
 									if (Math.random() < 0.1) {
 										reject(new Error('Erro ao criar solicitação!'));
 									} else {
-										resolve(parseInt(Math.random() * 1000));
+										resolve(Math.round(Math.random() * 1000));
 									}
 								}, 1000);
 						  })
 						: this.enviarFormulario(url, method, data),
-				num => {
+				(num: never) => {
 					if (num) {
 						definicao.classList.add('gm-ajg__lista__resultado--ok');
 						definicao.textContent = `Criada solicitação ${num}.`;
@@ -298,7 +290,7 @@ class PaginaNomeacoes extends Pagina {
 					}
 				},
 			];
-			return fns.reduce((p, fn) => p.then(fn), promise).catch(err => {
+			return fns.reduce((p, fn) => p.then(fn), promise).catch((err: Error) => {
 				definicao.classList.add('gm-ajg__lista__resultado--erro');
 				definicao.textContent = 'Erro.';
 				return Promise.reject(err);
@@ -326,13 +318,13 @@ class PaginaNomeacoes extends Pagina {
 				this.doc.defaultView.location.reload();
 			}
 		});
-		promise.catch(err => {
+		promise.catch((err: Error) => {
 			console.error(err);
 			this.doc.defaultView.alert(err.message);
 		});
 	}
 
-	validarFormularioExterno(form) {
+	validarFormularioExterno(form: HTMLFormElement) {
 		const camposEsperados = [
 			'hdnInfraTipoPagina',
 			'btnnovo',
@@ -358,7 +350,7 @@ class PaginaNomeacoes extends Pagina {
 			form.length === camposEsperados.length &&
 			camposEsperados.reduce((validadoAteAgora, nomeEsperado, i) => {
 				const elt = form.elements[i];
-				const nome = elt.name || elt.id;
+				const nome: string = (<any>elt).name || elt.id;
 				return validadoAteAgora && nome === nomeEsperado;
 			}, true);
 		if (!validado) {
@@ -386,12 +378,11 @@ class XHR {
 }
 
 function main() {
-	const pagina = Pagina.analisar(document);
-	pagina.adicionarAlteracoes();
-}
-
-function extrairParametrosUrl(url: string) {
-	return new URL(url).searchParams;
+	const acao = new URL(document.URL).searchParams.get('acao');
+	if (acao === 'nomeacoes_ajg_listar') {
+		const pagina = new PaginaNomeacoes(document);
+		pagina.adicionarAlteracoes();
+	}
 }
 
 main();
