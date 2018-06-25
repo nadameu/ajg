@@ -1,7 +1,7 @@
 {
-	"name": "preencher-rpv",
-	"version": "21.0.0",
-	"description": "Auxilia a conferência de RPVs e precatórios.",
+	"name": "ajg",
+	"version": "3.0.0",
+	"description": "Permite a criação de solicitações de pagamento em bloco",
 	"main": "src/index.ts",
 	"scripts": {
 		"build": "webpack --env.production --mode production",
@@ -13,14 +13,14 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/nadameu/preencher-rpv.git"
+		"url": "git+https://github.com/nadameu/ajg.git"
 	},
 	"author": "nadameu",
 	"license": "GPL-3.0",
 	"bugs": {
-		"url": "https://github.com/nadameu/preencher-rpv/issues"
+		"url": "https://github.com/nadameu/ajg/issues"
 	},
-	"homepage": "https://github.com/nadameu/preencher-rpv#readme",
+	"homepage": "https://github.com/nadameu/ajg#readme",
 	"devDependencies": {
 		"@babel/cli": "^7.0.0-beta.42",
 		"@babel/core": "^7.0.0-beta.42",
@@ -52,7 +52,6 @@
 		"webpack-dev-server": "^3.1.1"
 	},
 	"dependencies": {
-		"fp-ts": "^1.2.0",
 		"intl": "^1.2.5"
 	}
 }
