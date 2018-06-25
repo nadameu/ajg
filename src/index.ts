@@ -1,7 +1,7 @@
 import './includes/estilos.scss';
 import htmlFormulario from './includes/formulario.html';
 import { queryOne, querySome } from './query';
-import Either from './Either';
+import { Either, left, right } from './Either';
 
 class ErroLinkCriarNaoExiste extends Error {
 	constructor() {
@@ -42,8 +42,8 @@ class PaginaNomeacoes extends Pagina {
 		return tabela as HTMLTableElement;
 	}
 
-	adicionarAlteracoes() {
-		const aviso = this.adicionarAvisoCarregando();
+	async adicionarAlteracoes() {
+		const aviso = await this.adicionarAvisoCarregando();
 		this.adicionarFormulario()
 			.then(() => {
 				aviso.setCarregado(true);
@@ -56,13 +56,23 @@ class PaginaNomeacoes extends Pagina {
 			});
 	}
 
-	adicionarAvisoCarregando() {
-		const tabela = this.tabela;
+	async adicionarAvisoCarregando() {
+		const tabela = await queryOne('#tabelaNomAJG', this.doc)
+			.chain<HTMLTableElement>(
+				tbl =>
+					tbl.matches('table')
+						? right(tbl as HTMLTableElement)
+						: left(new Error("Elemento '#tabelaNomAJG' não é uma tabela."))
+			)
+			.toPromise();
 		tabela.insertAdjacentHTML(
 			'beforebegin',
 			'<label class="gm-ajg__aviso"></label>'
 		);
-		const aviso = this.doc.querySelector<HTMLLabelElement>('.gm-ajg__aviso');
+		const aviso = await queryOne<HTMLLabelElement>(
+			'.gm-ajg__aviso',
+			tabela
+		).toPromise();
 		let qtdPontinhos = 2;
 		function update() {
 			const pontinhos = '.'.repeat(qtdPontinhos + 1);
