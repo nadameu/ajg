@@ -1,4 +1,7 @@
 import './includes/estilos.scss';
+import htmlFormulario from './includes/formulario.html';
+import { queryOne, querySome } from './query';
+import Either from './Either';
 
 class ErroLinkCriarNaoExiste extends Error {
 	constructor() {
@@ -21,19 +24,10 @@ class Pagina {
 	}
 }
 
-class PaginaCriar extends Pagina {
-	get formElement(): HTMLFormElement {
-		const form = this.doc.getElementById('frmRequisicaoPagamentoAJG');
-		if (!form) {
-			throw new Error('Formulário não encontrado.');
-		}
-		if (!form.matches('form')) {
-			throw new Error(
-				'Elemento #frmRequisicaoPagamentoAJG não é um formulário.'
-			);
-		}
-		return form as HTMLFormElement;
-	}
+function obterFormularioRequisicaoPagamentoAJG(
+	doc: Document
+): Either<Error, HTMLFormElement> {
+	return queryOne('#frmRequisicaoPagamentoAJG', doc);
 }
 
 class PaginaNomeacoes extends Pagina {
@@ -92,71 +86,43 @@ class PaginaNomeacoes extends Pagina {
 		};
 	}
 
-	adicionarFormulario() {
-		const linkCriar = this.doc.querySelector<HTMLAnchorElement>(
-			'a[href^="controlador.php?acao=criar_solicitacao_pagamento&"]'
-		);
-		if (!linkCriar) return Promise.reject(new ErroLinkCriarNaoExiste());
-
-		const areaTelaD = this.doc.getElementById('divInfraAreaTelaD');
-		if (!areaTelaD)
-			return Promise.reject(
-				new Error('Elemento #divInfraAreaTelaD não encontrado.')
-			);
+	async adicionarFormulario() {
+		const linkCriar = (await querySome<HTMLAnchorElement>(
+			'a[href^="controlador.php?acao=criar_solicitacao_pagamento&"]',
+			this.doc
+		)
+			.mapLeft(() => new ErroLinkCriarNaoExiste())
+			.toPromise()).head;
+		const areaTelaD = await queryOne<HTMLDivElement>(
+			'#divInfraAreaTelaD',
+			this.doc
+		).toPromise();
 		areaTelaD.insertAdjacentHTML(
 			'beforeend',
 			'<div class="gm-ajg__div"></div>'
 		);
-		const div = this.doc.querySelector<HTMLDivElement>('.gm-ajg__div');
-		if (!div) {
-			return Promise.reject(
-				new Error('Elemento ".gm-ajg__div" não encontrado.')
-			);
-		}
-
+		const div = await queryOne<HTMLDivElement>(
+			'.gm-ajg__div',
+			areaTelaD
+		).toPromise();
 		div.innerHTML = '<label>Aguarde, carregando formulário...</label>';
-		return XHR.buscarDocumento(linkCriar.href).then(doc => {
+		return XHR.buscarDocumento(linkCriar.href).then(async doc => {
 			div.textContent = '';
-			const paginaCriar = new PaginaCriar(doc);
-			const form = paginaCriar.formElement.cloneNode(true) as HTMLFormElement;
+			const form = await obterFormularioRequisicaoPagamentoAJG(doc).toPromise();
 			if (!this.validarFormularioExterno(form))
 				return Promise.reject(new Error('Formulário não foi validado!'));
 			div.textContent = 'Ok.';
-			div.innerHTML = `
-<fieldset class="infraFieldset">
-<legend class="infraLegend">Criar solicitações de pagamento em bloco</legend>
-<form class="gm-ajg__formulario" method="${form.method}" action="${
-				form.action
-			}">
-	<label>Valor da solicitação (R$): <input name="txtValorSolicitacao" onpaste="return false;" onkeypress="return infraMascaraDinheiro(this, event, 2, 18);"></label><br>
-	<br>
-	<label>Data da prestação do serviço: <input id="gm-ajg__formulario__data" name="txtDataPrestacao" onpaste="return false;" onkeypress="return infraMascaraData(this, event);"></label><img title="Selecionar data" alt="Selecionar data" src="../../../infra_css/imagens/calendario.gif" class="infraImg" onclick="infraCalendario('gm-ajg__formulario__data', this);"><br>
-	<br>
-	<label class="infraLabel">Motivo:</label><br>
-	<label><input type="checkbox" name="chkMotivo[]" value="0"> Nível de especialização e complexidade do trabalho</label><br>
-	<label><input type="checkbox" name="chkMotivo[]" value="1"> Natureza e importância da causa</label><br>
-	<label><input type="checkbox" name="chkMotivo[]" value="6"> Lugar da prestação do serviço</label><br>
-	<label><input type="checkbox" name="chkMotivo[]" value="3"> Tempo de tramitação do processo</label><br>
-	<label><input type="checkbox" name="chkMotivo[]" value="2"> Grau de zelo profissional</label><br>
-	<label><input type="checkbox" name="chkMotivo[]" value="4"> Trabalho realizado pelo profissional</label><br>
-	<br>
-	<label>Observação:<br><textarea name="selTxtObservacao" cols="55" rows="4" maxlength="500"></textarea></label><br>
-	<br>
-	<label>Decisão fundamentada <small><em>(Obrigatório quando o valor extrapolar o máximo)</em></small>:<br><textarea name="selTxtDecisao" cols="55" rows="4" maxlength="2000"></textarea></label><br>
-</form>
-<br>
-<button class="gm-ajg__formulario__enviar">Criar solicitações em bloco</button>
-</fieldset>
-<output class="gm-ajg__resultado"></output>
-			`;
-			const enviar = this.doc.querySelector<HTMLButtonElement>(
-				'.gm-ajg__formulario__enviar'
-			);
-			if (!enviar) {
-				return Promise.reject(
-					new Error('Elemento ".gm-ajg__formulario__enviar" não encontrado.')
-				);
-			}
+			div.innerHTML = htmlFormulario;
+			const formulario = await queryOne<HTMLFormElement>(
+				'.gm-ajg__formulario',
+				div
+			).toPromise();
+			formulario.method = form.method;
+			formulario.action = form.action;
+			const enviar = await queryOne<HTMLButtonElement>(
+				'.gm-ajg__formulario__enviar',
+				div
+			).toPromise();
 			enviar.addEventListener('click', this.onEnviarClicado.bind(this));
 			return Promise.resolve();
 		});
