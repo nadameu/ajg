@@ -30,15 +30,19 @@ function obterFormularioRequisicaoPagamentoAJG(
 }
 
 class PaginaNomeacoes extends Pagina {
-	get tabela(): HTMLTableElement {
-		const tabela = this.doc.getElementById('tabelaNomAJG');
-		if (!tabela) {
-			throw new Error('Tabela não encontrada.');
-		}
-		if (!tabela.matches('table')) {
-			throw new Error('Elemento #tabelaNomAJG não é uma tabela.');
-		}
-		return tabela as HTMLTableElement;
+	get tabela(): Promise<HTMLTableElement> {
+		return queryOne('#tabelaNomAJG', this.doc)
+			.chain<HTMLTableElement>(
+				tbl =>
+					tbl.matches('table')
+						? right(tbl as HTMLTableElement)
+						: left(
+								new Error(
+									'Elemento "#tabelaNomAJG" não corresponde a uma tabela.'
+								)
+						  )
+			)
+			.toPromise();
 	}
 
 	async adicionarAlteracoes() {
@@ -132,7 +136,9 @@ class PaginaNomeacoes extends Pagina {
 				'.gm-ajg__formulario__enviar',
 				div
 			).toPromise();
-			enviar.addEventListener('click', this.onEnviarClicado.bind(this));
+			enviar.addEventListener('click', () =>
+				this.onEnviarClicado().then(x => console.log(x), e => console.error(e))
+			);
 			return Promise.resolve();
 		});
 	}
@@ -181,11 +187,11 @@ class PaginaNomeacoes extends Pagina {
 			linha
 		)
 			.chain<Nomeacao>(linkCriar => {
-			const parametros = new URL(linkCriar.href).searchParams;
+				const parametros = new URL(linkCriar.href).searchParams;
 				const idUnica = parametros.get('id_unica');
 				if (!idUnica)
 					return left(new Error('Não foi possível obter ID única.'));
-			const [numProcesso] = idUnica.split('|').slice(1);
+				const [numProcesso] = idUnica.split('|').slice(1);
 				if (!numProcesso)
 					return left(new Error('Não foi possível obter número do processo.'));
 				const numeroNomeacao = (
@@ -198,21 +204,22 @@ class PaginaNomeacoes extends Pagina {
 			.toPromise();
 	}
 
-	onEnviarClicado() {
-		const form = this.doc.querySelector<HTMLFormElement>('.gm-ajg__formulario');
-		if (!form)
-			throw new Error('Elemento ".gm-ajg__formulario" não encontrado.');
+	async onEnviarClicado() {
+		const form = await queryOne<HTMLFormElement>(
+			'.gm-ajg__formulario',
+			this.doc
+		).toPromise();
 		const url = form.action;
 		const method = form.method;
 
-		const tabela = this.tabela;
+		const tabela = await this.tabela;
 		const linhas = Array.from(tabela.rows).slice(1);
-		const linhasProcessosSelecionados = linhas.filter(linha => {
-			const checkbox = linha.querySelector<HTMLInputElement>(
-				'input[type="checkbox"]'
-			);
-			return checkbox && checkbox.checked;
-		});
+		const linhasProcessosSelecionados = linhas.filter(linha =>
+			queryOne<HTMLInputElement>('input[type="checkbox"]', linha).either(
+				() => false,
+				checkbox => checkbox.checked
+			)
+		);
 
 		if (linhasProcessosSelecionados.length === 0) return;
 		const pergunta =
@@ -223,7 +230,10 @@ class PaginaNomeacoes extends Pagina {
 				  } processos?`;
 		if (!confirm(pergunta)) return;
 
-		const resultado = this.doc.querySelector('.gm-ajg__resultado');
+		const resultado = await queryOne(
+			'.gm-ajg__resultado',
+			this.doc
+		).toPromise();
 		resultado.innerHTML = `
 <label>Solicitações a criar:</label><br>
 <dl class="gm-ajg__lista"></dl>
