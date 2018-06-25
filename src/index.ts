@@ -2,6 +2,7 @@ import './includes/estilos.scss';
 import htmlFormulario from './includes/formulario.html';
 import { queryOne, querySome } from './query';
 import { Either, left, right } from './Either';
+import buscarDocumento from './buscarDocumento';
 
 class ErroLinkCriarNaoExiste extends Error {
 	constructor() {
@@ -9,12 +10,10 @@ class ErroLinkCriarNaoExiste extends Error {
 	}
 }
 
-class Nomeacao {
-	constructor(
-		public idUnica: string,
-		public numProcesso: string,
-		public numeroNomeacao: string
-	) {}
+interface Nomeacao {
+	idUnica: string;
+	numProcesso: string;
+	numeroNomeacao: string;
 }
 
 class Pagina {
@@ -116,7 +115,7 @@ class PaginaNomeacoes extends Pagina {
 			areaTelaD
 		).toPromise();
 		div.innerHTML = '<label>Aguarde, carregando formulário...</label>';
-		return XHR.buscarDocumento(linkCriar.href).then(async doc => {
+		return buscarDocumento(linkCriar.href).then(async doc => {
 			div.textContent = '';
 			const form = await obterFormularioRequisicaoPagamentoAJG(doc).toPromise();
 			if (!this.validarFormularioExterno(form))
@@ -139,7 +138,7 @@ class PaginaNomeacoes extends Pagina {
 	}
 
 	enviarFormulario(url: string, method: string, data: FormData) {
-		return XHR.buscarDocumento(url, method, data).then(doc => {
+		return buscarDocumento(url, method, data).then(doc => {
 			const validacao = doc.getElementById('txaInfraValidacao');
 			const excecoes = Array.from(doc.querySelectorAll('.infraExcecao'));
 			const tabelaErros = doc.querySelector<HTMLTableElement>(
@@ -176,18 +175,27 @@ class PaginaNomeacoes extends Pagina {
 		});
 	}
 
-	nomeacaoFromLinha(linha: HTMLTableRowElement) {
-		const linkCriar = linha.querySelector<HTMLAnchorElement>(
-			'a[href^="controlador.php?acao=criar_solicitacao_pagamento&"]'
-		);
-		if (linkCriar) {
+	nomeacaoFromLinha(linha: HTMLTableRowElement): Promise<Nomeacao> {
+		return queryOne<HTMLAnchorElement>(
+			'a[href^="controlador.php?acao=criar_solicitacao_pagamento&"]',
+			linha
+		)
+			.chain<Nomeacao>(linkCriar => {
 			const parametros = new URL(linkCriar.href).searchParams;
-			const idUnica = parametros.get('id_unica') || '';
+				const idUnica = parametros.get('id_unica');
+				if (!idUnica)
+					return left(new Error('Não foi possível obter ID única.'));
 			const [numProcesso] = idUnica.split('|').slice(1);
-			const numeroNomeacao = ((linha.cells[2] || {}).textContent || '').trim();
-			return new Nomeacao(idUnica, numProcesso, numeroNomeacao);
-		}
-		return null;
+				if (!numProcesso)
+					return left(new Error('Não foi possível obter número do processo.'));
+				const numeroNomeacao = (
+					(linha.cells[2] || {}).textContent || ''
+				).trim();
+				if (numeroNomeacao === '')
+					return left(new Error('Não foi possível obter número da nomeação.'));
+				return right({ idUnica, numProcesso, numeroNomeacao });
+			})
+			.toPromise();
 	}
 
 	onEnviarClicado() {
@@ -333,23 +341,6 @@ class PaginaNomeacoes extends Pagina {
 			console.error('Campos do formulário não correspondem ao esperado');
 		}
 		return validado;
-	}
-}
-
-class XHR {
-	static buscarDocumento(
-		url: string,
-		method = 'GET',
-		data: any = null
-	): Promise<Document> {
-		return new Promise((resolve, reject) => {
-			const xhr = new XMLHttpRequest();
-			xhr.open(method, url);
-			xhr.responseType = 'document';
-			xhr.addEventListener('load', () => resolve(xhr.response));
-			xhr.addEventListener('error', reject);
-			xhr.send(data);
-		});
 	}
 }
 
