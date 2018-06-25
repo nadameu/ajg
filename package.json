@@ -1,0 +1,58 @@
+{
+	"name": "preencher-rpv",
+	"version": "21.0.0",
+	"description": "Auxilia a conferência de RPVs e precatórios.",
+	"main": "src/index.ts",
+	"scripts": {
+		"build": "webpack --env.production --mode production",
+		"build:dev": "webpack --env.development --mode development",
+		"serve": "webpack-dev-server --env.development --mode development --open",
+		"start": "yarn run build:dev && yarn run serve",
+		"test": "jest",
+		"type-check": "tsc"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/nadameu/preencher-rpv.git"
+	},
+	"author": "nadameu",
+	"license": "GPL-3.0",
+	"bugs": {
+		"url": "https://github.com/nadameu/preencher-rpv/issues"
+	},
+	"homepage": "https://github.com/nadameu/preencher-rpv#readme",
+	"devDependencies": {
+		"@babel/cli": "^7.0.0-beta.42",
+		"@babel/core": "^7.0.0-beta.42",
+		"@babel/plugin-proposal-class-properties": "^7.0.0-beta.42",
+		"@babel/preset-env": "^7.0.0-beta.42",
+		"@babel/preset-typescript": "^7.0.0-beta.42",
+		"@types/clean-webpack-plugin": "^0.1.2",
+		"@types/greasemonkey": "0.0.28",
+		"@types/intl": "^1.2.0",
+		"@types/jest": "^22.2.2",
+		"@types/node": "^9.6.0",
+		"@types/uglifyjs-webpack-plugin": "^1.1.0",
+		"@types/webpack": "^4.1.2",
+		"babel-loader": "^8.0.0-beta.2",
+		"clean-webpack-plugin": "^0.1.19",
+		"css-loader": "^0.28.11",
+		"detect-node": "^2.0.3",
+		"jest": "^22.4.3",
+		"node-sass": "^4.8.3",
+		"raw-loader": "^0.5.1",
+		"sass-loader": "^6.0.7",
+		"style-loader": "^0.20.3",
+		"ts-jest": "^22.4.2",
+		"ts-node": "^5.0.1",
+		"typescript": "^2.8.1",
+		"userscript-meta": "^1.0.1",
+		"webpack": "^4.3.0",
+		"webpack-cli": "^2.0.13",
+		"webpack-dev-server": "^3.1.1"
+	},
+	"dependencies": {
+		"fp-ts": "^1.2.0",
+		"intl": "^1.2.5"
+	}
+}

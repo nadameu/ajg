@@ -1,0 +1,74 @@
+table a {
+	font-size: 1em;
+}
+.gm-requisicao__tabela {
+	tr::before {
+		content: '';
+		font-size: 1.2em;
+		font-weight: bold;
+	}
+	.gm-resposta--correta {
+		td,
+		span {
+			color: hsl(240, 10%, 65%);
+		}
+		&::before {
+			content: '✓';
+			color: hsl(120, 25%, 65%);
+		}
+	}
+	.gm-resposta--incorreta {
+		td,
+		span {
+			color: hsl(0, 100%, 40%);
+		}
+		&::before {
+			content: '✗';
+			color: hsl(0, 100%, 40%);
+			text-shadow: none;
+		}
+	}
+	.gm-resposta--indefinida {
+		td,
+		span {
+			color: hsl(30, 100%, 40%);
+		}
+		&::before {
+			content: '?';
+			color: hsl(30, 100%, 40%);
+			text-shadow: none;
+		}
+	}
+}
+.gm-resposta {
+}
+p.gm-resposta {
+	font-size: 1.2em;
+	margin: 1em 0 0;
+}
+.gm-resposta--correta {
+	color: hsl(120, 25%, 75%);
+}
+.gm-resposta--incorreta {
+	color: hsl(0, 100%, 40%);
+	text-shadow: 0 2px 2px hsl(0, 75%, 60%);
+}
+.gm-resposta--indefinida {
+	color: hsl(30, 100%, 40%);
+	text-shadow: 0 2px 3px hsl(30, 75%, 60%);
+}
+
+p.gm-dados-adicionais {
+	margin-top: 0;
+	margin-left: 2ex;
+}
+.gm-botoes {
+	margin: 4em 0;
+	display: flex;
+	justify-content: space-around;
+}
+table.gm-tabela-eventos {
+	td {
+		padding: 0 0.5ex;
+	}
+}
