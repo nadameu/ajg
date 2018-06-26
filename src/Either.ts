@@ -1,16 +1,24 @@
+import Maybe, { nothing, just } from './Maybe';
+
 export abstract class Either<L, R> {
 	abstract either<B>(f: (_: L) => B, g: (_: R) => B): B;
 	ap<B>(that: Either<L, (_: R) => B>): Either<L, B> {
-		return that.chain(f => this.map(f));
+		return this.chain(r => that.map(f => f(r)));
+	}
+	ap_<L, A, B>(this: Either<L, (_: A) => B>, that: Either<L, A>): Either<L, B> {
+		return this.chain(f => that.map(r => f(r)));
 	}
 	chain<B>(f: (_: R) => Either<L, B>): Either<L, B> {
-		return this.either<Either<L, B>>(left, f);
+		return this.either(() => <any>this, f);
 	}
 	map<B>(f: (_: R) => B): Either<L, B> {
-		return this.either<Either<L, B>>(left, r => right(f(r)));
+		return this.chain(r => right(f(r)));
 	}
 	mapLeft<B>(f: (_: L) => B): Either<B, R> {
-		return this.either<Either<B, R>>(l => left(f(l)), right);
+		return this.either(l => left(f(l)), () => this as any);
+	}
+	toMaybe(): Maybe<R> {
+		return this.either(() => nothing(), r => just(r));
 	}
 	toPromise(): Promise<R> {
 		return this.either(l => Promise.reject(l), r => Promise.resolve(r));
@@ -22,7 +30,7 @@ export abstract class Either<L, R> {
 }
 
 class Left<L> extends Either<L, never> {
-	constructor(private _value: L) {
+	constructor(private readonly _value: L) {
 		super();
 	}
 	either<B>(f: (_: L) => B, _: any): B {
@@ -34,7 +42,7 @@ export function left<L, R>(l: L): Either<L, R> {
 }
 
 class Right<R> extends Either<never, R> {
-	constructor(private _value: R) {
+	constructor(private readonly _value: R) {
 		super();
 	}
 	either<B>(_: any, g: (_: R) => B): B {
@@ -43,6 +51,59 @@ class Right<R> extends Either<never, R> {
 }
 export function right<L, R>(r: R): Either<L, R> {
 	return new Right(r);
+}
+
+export function liftA1<L, A, B>(
+	f: (_: A) => B,
+	fa: Either<L, A>
+): Either<L, B> {
+	return fa.map(f);
+}
+export function liftA2<L, A, B, C>(
+	f: (a: A, b: B) => C,
+	fa: Either<L, A>,
+	fb: Either<L, B>
+): Either<L, C> {
+	return fa.map((a: A) => (b: B) => f(a, b)).ap_(fb);
+}
+export function liftA3<L, A, B, C, D>(
+	f: (a: A, b: B, c: C) => D,
+	fa: Either<L, A>,
+	fb: Either<L, B>,
+	fc: Either<L, C>
+): Either<L, D> {
+	return fa
+		.map((a: A) => (b: B) => (c: C) => f(a, b, c))
+		.ap_(fb)
+		.ap_(fc);
+}
+export function liftA4<L, A, B, C, D, E>(
+	f: (a: A, b: B, c: C, d: D) => E,
+	fa: Either<L, A>,
+	fb: Either<L, B>,
+	fc: Either<L, C>,
+	fd: Either<L, D>
+): Either<L, E> {
+	return fa
+		.map((a: A) => (b: B) => (c: C) => (d: D) => f(a, b, c, d))
+		.ap_(fb)
+		.ap_(fc)
+		.ap_(fd);
+}
+export function liftA5<L, A, B, C, D, E, F>(
+	f: (a: A, b: B, c: C, d: D, e: E) => F,
+	fa: Either<L, A>,
+	fb: Either<L, B>,
+	fc: Either<L, C>,
+	fd: Either<L, D>,
+	fe: Either<L, E>
+): Either<L, F> {
+	return fa
+		.map((a: A) => (b: B) => (c: C) => (d: D) => (e: E) => f(a, b, c, d, e))
+		.ap_(fb)
+		.ap_(fc)
+		.ap_(fd)
+		.ap_(fe);
 }
 
 export default Either;

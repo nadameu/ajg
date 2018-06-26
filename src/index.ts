@@ -1,8 +1,9 @@
+import buscarDocumento from './buscarDocumento';
+import { Either, liftA2, liftA3 } from './Either';
 import './includes/estilos.scss';
 import htmlFormulario from './includes/formulario.html';
+import Maybe from './Maybe';
 import { queryOne, querySome } from './query';
-import { Either, left, right } from './Either';
-import buscarDocumento from './buscarDocumento';
 
 class ErroLinkCriarNaoExiste extends Error {
 	constructor() {
@@ -29,22 +30,13 @@ function obterFormularioRequisicaoPagamentoAJG(
 	return queryOne('#frmRequisicaoPagamentoAJG', doc);
 }
 
-class PaginaNomeacoes extends Pagina {
-	get tabela(): Promise<HTMLTableElement> {
-		return queryOne('#tabelaNomAJG', this.doc)
-			.chain<HTMLTableElement>(
-				tbl =>
-					tbl.matches('table')
-						? right(tbl as HTMLTableElement)
-						: left(
-								new Error(
-									'Elemento "#tabelaNomAJG" não corresponde a uma tabela.'
-								)
-						  )
-			)
-			.toPromise();
-	}
+function obterTabelaNomeacoesAJG(
+	doc: Document
+): Either<Error, HTMLTableElement> {
+	return queryOne<HTMLTableElement>('table#tabelaNomAJG', doc);
+}
 
+class PaginaNomeacoes extends Pagina {
 	async adicionarAlteracoes() {
 		const aviso = await this.adicionarAvisoCarregando();
 		this.adicionarFormulario()
@@ -60,22 +52,15 @@ class PaginaNomeacoes extends Pagina {
 	}
 
 	async adicionarAvisoCarregando() {
-		const tabela = await queryOne('#tabelaNomAJG', this.doc)
-			.chain<HTMLTableElement>(
-				tbl =>
-					tbl.matches('table')
-						? right(tbl as HTMLTableElement)
-						: left(new Error("Elemento '#tabelaNomAJG' não é uma tabela."))
-			)
-			.toPromise();
-		tabela.insertAdjacentHTML(
-			'beforebegin',
-			'<label class="gm-ajg__aviso"></label>'
-		);
-		const aviso = await queryOne<HTMLLabelElement>(
-			'.gm-ajg__aviso',
-			tabela
-		).toPromise();
+		const eitherTabela = obterTabelaNomeacoesAJG(this.doc);
+		const eitherAviso = eitherTabela.chain(tabela => {
+			tabela.insertAdjacentHTML(
+				'beforebegin',
+				'<label class="gm-ajg__aviso"></label>'
+			);
+			return queryOne<HTMLLabelElement>('.gm-ajg__aviso', this.doc);
+		});
+
 		let qtdPontinhos = 2;
 		function update() {
 			const pontinhos = '.'.repeat(qtdPontinhos + 1);
@@ -99,48 +84,58 @@ class PaginaNomeacoes extends Pagina {
 		};
 	}
 
-	async adicionarFormulario() {
-		const linkCriar = (await querySome<HTMLAnchorElement>(
+	adicionarFormulario() {
+		const eitherLinkCriar = querySome<HTMLAnchorElement>(
 			'a[href^="controlador.php?acao=criar_solicitacao_pagamento&"]',
 			this.doc
 		)
 			.mapLeft(() => new ErroLinkCriarNaoExiste())
-			.toPromise()).head;
-		const areaTelaD = await queryOne<HTMLDivElement>(
-			'#divInfraAreaTelaD',
+			.map(l => l.head);
+		const eitherAreaTelaD = queryOne<HTMLDivElement>(
+			'div#divInfraAreaTelaD',
 			this.doc
-		).toPromise();
-		areaTelaD.insertAdjacentHTML(
-			'beforeend',
-			'<div class="gm-ajg__div"></div>'
 		);
-		const div = await queryOne<HTMLDivElement>(
-			'.gm-ajg__div',
-			areaTelaD
-		).toPromise();
-		div.innerHTML = '<label>Aguarde, carregando formulário...</label>';
-		return buscarDocumento(linkCriar.href).then(async doc => {
-			div.textContent = '';
-			const form = await obterFormularioRequisicaoPagamentoAJG(doc).toPromise();
-			if (!this.validarFormularioExterno(form))
-				return Promise.reject(new Error('Formulário não foi validado!'));
-			div.textContent = 'Ok.';
-			div.innerHTML = htmlFormulario;
-			const formulario = await queryOne<HTMLFormElement>(
-				'.gm-ajg__formulario',
-				div
-			).toPromise();
-			formulario.method = form.method;
-			formulario.action = form.action;
-			const enviar = await queryOne<HTMLButtonElement>(
-				'.gm-ajg__formulario__enviar',
-				div
-			).toPromise();
-			enviar.addEventListener('click', () =>
-				this.onEnviarClicado().then(x => console.log(x), e => console.error(e))
+		const eitherDiv = eitherAreaTelaD.chain(areaTelaD => {
+			areaTelaD.insertAdjacentHTML(
+				'beforeend',
+				'<div class="gm-ajg__div"></div>'
 			);
-			return Promise.resolve();
+			return queryOne<HTMLDivElement>('.gm-ajg__div', areaTelaD);
 		});
+		function somethingSomethingSomething(
+			linkCriar: HTMLAnchorElement,
+			div: HTMLDivElement
+		) {
+			div.innerHTML = '<label>Aguarde, carregando formulário...</label>';
+			return buscarDocumento(linkCriar.href).then(async doc => {
+				div.textContent = '';
+				const form = await obterFormularioRequisicaoPagamentoAJG(
+					doc
+				).toPromise();
+				if (!this.validarFormularioExterno(form))
+					return Promise.reject(new Error('Formulário não foi validado!'));
+				div.textContent = 'Ok.';
+				div.innerHTML = htmlFormulario;
+				const formulario = await queryOne<HTMLFormElement>(
+					'.gm-ajg__formulario',
+					div
+				).toPromise();
+				formulario.method = form.method;
+				formulario.action = form.action;
+				const enviar = await queryOne<HTMLButtonElement>(
+					'.gm-ajg__formulario__enviar',
+					div
+				).toPromise();
+				enviar.addEventListener('click', () =>
+					this.onEnviarClicado().then(
+						x => console.log(x),
+						e => console.error(e)
+					)
+				);
+				return Promise.resolve();
+			});
+		}
+		return liftA2(somethingSomethingSomething, eitherLinkCriar, eitherDiv);
 	}
 
 	enviarFormulario(url: string, method: string, data: FormData) {
@@ -181,27 +176,38 @@ class PaginaNomeacoes extends Pagina {
 		});
 	}
 
-	nomeacaoFromLinha(linha: HTMLTableRowElement): Promise<Nomeacao> {
-		return queryOne<HTMLAnchorElement>(
+	nomeacaoFromLinha(linha: HTMLTableRowElement): Either<Error, Nomeacao> {
+		const eitherLinkCriar = queryOne<HTMLAnchorElement>(
 			'a[href^="controlador.php?acao=criar_solicitacao_pagamento&"]',
 			linha
-		)
-			.chain<Nomeacao>(linkCriar => {
-				const parametros = new URL(linkCriar.href).searchParams;
-				const idUnica = parametros.get('id_unica');
-				if (!idUnica)
-					return left(new Error('Não foi possível obter ID única.'));
-				const [numProcesso] = idUnica.split('|').slice(1);
-				if (!numProcesso)
-					return left(new Error('Não foi possível obter número do processo.'));
-				const numeroNomeacao = (
-					(linha.cells[2] || {}).textContent || ''
-				).trim();
-				if (numeroNomeacao === '')
-					return left(new Error('Não foi possível obter número da nomeação.'));
-				return right({ idUnica, numProcesso, numeroNomeacao });
-			})
-			.toPromise();
+		);
+		const eitherIdUnica = eitherLinkCriar
+			.toMaybe()
+			.map(link => new URL(link.href).searchParams)
+			.mapNullable(p => p.get('id_unica'))
+			.toEither_(() => new Error('Não foi possível obter ID única.'));
+		const eitherNumeroProcesso = eitherIdUnica
+			.toMaybe()
+			.map(id => id.split('|'))
+			.mapNullable(partes => partes[1])
+			.toEither_(() => new Error('Não foi possível obter número do processo.'));
+		const eitherNumeroNomeacao = Maybe.of<HTMLTableRowElement>(linha)
+			.map(linha => linha.cells)
+			.mapNullable(celulas => celulas[2])
+			.mapNullable(celula => celula.textContent)
+			.map(texto => texto.trim())
+			.filter(texto => texto !== '')
+			.toEither_(() => new Error('Não foi possível obter número da nomeação.'));
+		return liftA3(
+			(idUnica, numProcesso, numeroNomeacao) => ({
+				idUnica,
+				numProcesso,
+				numeroNomeacao,
+			}),
+			eitherIdUnica,
+			eitherNumeroProcesso,
+			eitherNumeroNomeacao
+		);
 	}
 
 	async onEnviarClicado() {
