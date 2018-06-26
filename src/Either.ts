@@ -1,4 +1,5 @@
 import Maybe, { nothing, just } from './Maybe';
+import { Task } from './Task';
 
 export abstract class Either<L, R> {
 	abstract either<B>(f: (_: L) => B, g: (_: R) => B): B;
@@ -11,6 +12,12 @@ export abstract class Either<L, R> {
 	chain<B>(f: (_: R) => Either<L, B>): Either<L, B> {
 		return this.either(() => <any>this, f);
 	}
+	concatObj<A extends Object, B extends Object>(
+		this: Either<L, A>,
+		that: Either<L, B>
+	): Either<L, A & B> {
+		return this.ap(that.map(b => (a: A) => Object.assign({}, a, b)));
+	}
 	map<B>(f: (_: R) => B): Either<L, B> {
 		return this.chain(r => right(f(r)));
 	}
@@ -22,6 +29,9 @@ export abstract class Either<L, R> {
 	}
 	toPromise(): Promise<R> {
 		return this.either(l => Promise.reject(l), r => Promise.resolve(r));
+	}
+	toTask(): Task<L, R> {
+		return this.either<Task<L, R>>(Task.rejected, Task.of);
 	}
 
 	static of<L, R>(r: R): Either<L, R> {
