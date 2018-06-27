@@ -1,9 +1,20 @@
 .gm-ajg__aviso {
-}
-.gm-ajg__aviso--carregado {
-}
-.gm-ajg__aviso--nao-carregado {
-	display: none;
+	&.gm-ajg__aviso--carregando {
+		.gm-ajg__aviso-carregando {
+			display: inline-block;
+		}
+		.gm-ajg__aviso-carregado {
+			display: none;
+		}
+	}
+	&.gm-ajg__aviso--carregado {
+		.gm-ajg__aviso-carregando {
+			display: none;
+		}
+		.gm-ajg__aviso-carregado {
+			display: inline-block;
+		}
+	}
 }
 .gm-ajg__lista {
 	font-size: 1.2em;
