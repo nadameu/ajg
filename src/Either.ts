@@ -2,6 +2,8 @@ import Maybe, { nothing, just } from './Maybe';
 import { Task } from './Task';
 
 export abstract class Either<L, R> {
+	abstract isLeft: boolean;
+	abstract isRight: boolean;
 	abstract either<B>(f: (_: L) => B, g: (_: R) => B): B;
 	ap<B>(that: Either<L, (_: R) => B>): Either<L, B> {
 		return this.chain(r => that.map(f => f(r)));
@@ -55,6 +57,8 @@ export abstract class Either<L, R> {
 }
 
 class Left<L> extends Either<L, never> {
+	isLeft = true;
+	isRight = false;
 	constructor(private readonly _value: L) {
 		super();
 	}
@@ -67,6 +71,8 @@ export function left<L, R>(l: L): Either<L, R> {
 }
 
 class Right<R> extends Either<never, R> {
+	isLeft = false;
+	isRight = true;
 	constructor(private readonly _value: R) {
 		super();
 	}

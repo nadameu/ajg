@@ -20,6 +20,9 @@ export abstract class Maybe<A> {
 	filter(p: (_: A) => boolean): Maybe<A> {
 		return this.chain(a => (p(a) ? just(a) : nothing()));
 	}
+	getOrElse(a: A): A {
+		return this.maybe(a, a => a);
+	}
 	map<B>(f: (_: A) => B): Maybe<B> {
 		return this.chain(a => just(f(a)));
 	}
@@ -91,6 +94,56 @@ export class Nothing extends Maybe<never> {
 }
 export function nothing<A>(): Maybe<A> {
 	return new Nothing();
+}
+
+export function liftA1<A, B>(f: (_: A) => B, fa: Maybe<A>): Maybe<B> {
+	return fa.map(f);
+}
+export function liftA2<A, B, C>(
+	f: (a: A, b: B) => C,
+	fa: Maybe<A>,
+	fb: Maybe<B>
+): Maybe<C> {
+	return fa.map((a: A) => (b: B) => f(a, b)).ap_(fb);
+}
+export function liftA3<A, B, C, D>(
+	f: (a: A, b: B, c: C) => D,
+	fa: Maybe<A>,
+	fb: Maybe<B>,
+	fc: Maybe<C>
+): Maybe<D> {
+	return fa
+		.map((a: A) => (b: B) => (c: C) => f(a, b, c))
+		.ap_(fb)
+		.ap_(fc);
+}
+export function liftA4<A, B, C, D, E>(
+	f: (a: A, b: B, c: C, d: D) => E,
+	fa: Maybe<A>,
+	fb: Maybe<B>,
+	fc: Maybe<C>,
+	fd: Maybe<D>
+): Maybe<E> {
+	return fa
+		.map((a: A) => (b: B) => (c: C) => (d: D) => f(a, b, c, d))
+		.ap_(fb)
+		.ap_(fc)
+		.ap_(fd);
+}
+export function liftA5<A, B, C, D, E, F>(
+	f: (a: A, b: B, c: C, d: D, e: E) => F,
+	fa: Maybe<A>,
+	fb: Maybe<B>,
+	fc: Maybe<C>,
+	fd: Maybe<D>,
+	fe: Maybe<E>
+): Maybe<F> {
+	return fa
+		.map((a: A) => (b: B) => (c: C) => (d: D) => (e: E) => f(a, b, c, d, e))
+		.ap_(fb)
+		.ap_(fc)
+		.ap_(fd)
+		.ap_(fe);
 }
 
 export default Maybe;
