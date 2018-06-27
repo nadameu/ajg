@@ -1,5 +1,6 @@
 import Either from './Either';
 import { queryAll, queryOneE } from './query';
+import { Elementos } from './typings';
 
 type Translate<O> = Either<
 	Error,
@@ -18,16 +19,20 @@ function translate<T extends { [key: string]: Either<Error, any> }>(
 ): Translate<typeof obj> {
 	return Object.keys(obj).reduce(
 		(newObj, key) =>
-			newObj.ap(obj[key].map(a => (as: {}) => Object.assign(as, a))),
+			newObj.ap(
+				obj[key].map(a => (as: {}) => Object.assign(as, { [key]: a }) as any)
+			),
 		Either.of<Error, {}>({})
 	);
 }
 
-export default function obterElementos(doc: Document):Either<Error,Elementos> {
+export default function obterElementos(
+	doc: Document
+): Either<Error, Elementos> {
 	const all = allFactory(doc);
 	const one = oneFactory(doc);
 	return translate({
-		areaTelaD: one<HTMLDivElement>('div#divInfraAreaTelaD');
+		areaTelaD: one<HTMLDivElement>('div#divInfraAreaTelaD'),
 		linksCriar: all<HTMLAnchorElement>(
 			'a[href^="controlador.php?acao=criar_solicitacao_pagamento&"]'
 		),
