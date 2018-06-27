@@ -9,6 +9,9 @@ export abstract class Either<L, R> {
 	ap_<L, A, B>(this: Either<L, (_: A) => B>, that: Either<L, A>): Either<L, B> {
 		return this.chain(f => that.map(r => f(r)));
 	}
+	bimap<A, B>(f: (_: L) => A, g: (_: R) => B): Either<A, B> {
+		return this.either(l => left(f(l)), r => right(g(r)));
+	}
 	chain<B>(f: (_: R) => Either<L, B>): Either<L, B> {
 		return this.either(() => <any>this, f);
 	}
@@ -19,10 +22,10 @@ export abstract class Either<L, R> {
 		return this.ap(that.map(b => (a: A) => Object.assign({}, a, b)));
 	}
 	map<B>(f: (_: R) => B): Either<L, B> {
-		return this.chain(r => right(f(r)));
+		return this.bimap(l => l, f);
 	}
 	mapLeft<B>(f: (_: L) => B): Either<B, R> {
-		return this.either(l => left(f(l)), () => this as any);
+		return this.bimap(f, r => r);
 	}
 	toMaybe(): Maybe<R> {
 		return this.either(() => nothing(), r => just(r));
@@ -36,6 +39,18 @@ export abstract class Either<L, R> {
 
 	static of<L, R>(r: R): Either<L, R> {
 		return new Right(r);
+	}
+	static partition<A, R extends A>(p: (a: A) => a is R, a: A): Either<A, R>;
+	static partition<A>(p: (_: A) => boolean, a: A): Either<A, A>;
+	static partition<A>(p: (_: A) => boolean, a: A) {
+		return p(a) ? right(a) : left(a);
+	}
+	static try<L, R>(f: (_: Error) => L, g: () => R): Either<L, R> {
+		try {
+			return right(g());
+		} catch (e) {
+			return left(f(e));
+		}
 	}
 }
 

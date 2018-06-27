@@ -1,10 +1,11 @@
+import './Array';
 import buscarDocumento from './buscarDocumento';
-import { Either, left, liftA2, liftA3, right } from './Either';
+import { Either, left, liftA3, right } from './Either';
 import './includes/estilos.scss';
 import htmlFormulario from './includes/formulario.html';
 import Maybe from './Maybe';
-import { queryOne, querySome } from './query';
 import { NonEmptyArray } from './NonEmptyArray';
+import { queryAll, queryOne, queryOneE, querySomeE } from './query';
 import { Task } from './Task';
 
 class ErroLinkCriarNaoExiste extends Error {
@@ -87,11 +88,11 @@ function adicionarFormulario(
 		);
 		div.textContent = 'Ok.';
 		div.innerHTML = htmlFormulario;
-		const eitherFormulario = queryOne<HTMLFormElement>(
+		const eitherFormulario = queryOneE<HTMLFormElement>(
 			'.gm-ajg__formulario',
 			div
 		);
-		const eitherEnviar = queryOne<HTMLButtonElement>(
+		const eitherEnviar = queryOneE<HTMLButtonElement>(
 			'.gm-ajg__formulario__enviar',
 			div
 		);
@@ -111,47 +112,50 @@ function adicionarFormulario(
 }
 
 function enviarFormulario(url: string, method: string, data: FormData) {
-	return buscarDocumento(url, method, data).then(doc => {
-		const validacao = doc.getElementById('txaInfraValidacao');
-		const excecoes = Array.from(doc.querySelectorAll('.infraExcecao'));
-		const tabelaErros = doc.querySelector<HTMLTableElement>(
-			'table[summary="Erro(s)"]'
-		);
-		if (validacao) {
-			const match = (validacao.textContent || '')
-				.trim()
-				.match(/^Solicitação de pagamento (\d+) criada$/);
-			if (match) {
-				return match[1];
-			}
+	return buscarDocumento(url, method, data).chain((doc): Task<
+		Error,
+		boolean | string
+	> => {
+		const maybeValidacao = queryOne('textarea#txaInfraValidacao', doc)
+			.mapNullable(elt => elt.textContent)
+			.map(txt => txt.trim())
+			.mapNullable(txt => txt.match(/^Solicitação de pagamento (\d+) criada$/))
+			.map(m => m[1]);
+		if (maybeValidacao.isJust) {
+			return maybeValidacao.toTask(() => {});
 		}
-		const msgsErro = new Set([
-			'Houve um erro ao tentar criar a solicitação!',
-			'',
-		]);
-		excecoes.forEach(excecao =>
-			msgsErro.add((excecao.textContent || '').trim())
+
+		const excecoes = queryAll('.infraExcecao', doc)
+			.mapNullable(e => e.textContent)
+			.map(t => t.trim());
+		const erros = queryOne<HTMLTableElement>('table[summary="Erro(s)"]', doc)
+			.toArray()
+			.chain(t => t.rows)
+			.slice(1)
+			.mapNullable<HTMLTableCellElement>(r => r.cells[1])
+			.mapNullable(c => c.textContent)
+			.map(t => t.trim());
+
+		const msgsErro = new Set(
+			['Houve um erro ao tentar criar a solicitação!', ''].concat(
+				erros,
+				excecoes
+			)
 		);
-		if (tabelaErros) {
-			const tBodyRows = Array.from(tabelaErros.rows).slice(1);
-			tBodyRows
-				.map(linha => ((linha.cells[1] || {}).textContent || '').trim())
-				.forEach(msg => msgsErro.add(msg));
-		}
 		window.errorDoc = doc;
 		console.error('DEBUG: window.errorDoc');
-		if (excecoes.length === 0 && !tabelaErros) {
-			return false;
+		if (excecoes.length + erros.length === 0) {
+			return Task.of(false);
 		}
 		const msgErro = Array.from(msgsErro.values()).join('\n');
-		throw new Error(msgErro);
+		return Task.rejected(new Error(msgErro));
 	});
 }
 
 function nomeacaoFromLinha(
 	linha: HTMLTableRowElement
 ): Either<Error, Nomeacao> {
-	const eitherLinkCriar = queryOne<HTMLAnchorElement>(
+	const eitherLinkCriar = queryOneE<HTMLAnchorElement>(
 		'a[href^="controlador.php?acao=criar_solicitacao_pagamento&"]',
 		linha
 	);
@@ -186,7 +190,7 @@ function nomeacaoFromLinha(
 
 async function onEnviarClicado(tabela: HTMLTableElement) {
 	const doc = tabela.ownerDocument;
-	const form = await queryOne<HTMLFormElement>(
+	const form = await queryOneE<HTMLFormElement>(
 		'.gm-ajg__formulario',
 		doc
 	).toPromise();
@@ -195,7 +199,7 @@ async function onEnviarClicado(tabela: HTMLTableElement) {
 
 	const linhas = Array.from(tabela.rows).slice(1);
 	const linhasProcessosSelecionados = linhas.filter(linha =>
-		queryOne<HTMLInputElement>('input[type="checkbox"]', linha).either(
+		queryOneE<HTMLInputElement>('input[type="checkbox"]', linha).either(
 			() => false,
 			checkbox => checkbox.checked
 		)
@@ -210,7 +214,7 @@ async function onEnviarClicado(tabela: HTMLTableElement) {
 			  } processos?`;
 	if (!confirm(pergunta)) return;
 
-	const resultado = await queryOne('.gm-ajg__resultado', this.doc).toPromise();
+	const resultado = await queryOneE('.gm-ajg__resultado', this.doc).toPromise();
 	resultado.innerHTML = `
 <label>Solicitações a criar:</label><br>
 <dl class="gm-ajg__lista"></dl>
@@ -337,18 +341,18 @@ function namedProp<K extends string, A>(name: K) {
 }
 
 function obterFormularioRequisicaoPagamentoAJG(doc: Document) {
-	return queryOne<HTMLFormElement>('form#frmRequisicaoPagamentoAJG', doc);
+	return queryOneE<HTMLFormElement>('form#frmRequisicaoPagamentoAJG', doc);
 }
 
 function obterElementosPagina(doc: Document) {
 	return Either.of<Error, {}>({})
 		.concatObj(
-			queryOne<HTMLTableElement>('table#tabelaNomAJG', doc).map(
+			queryOneE<HTMLTableElement>('table#tabelaNomAJG', doc).map(
 				namedProp('tabelaNomAJG')
 			)
 		)
 		.concatObj(
-			querySome<HTMLAnchorElement>(
+			querySomeE<HTMLAnchorElement>(
 				'a[href^="controlador.php?acao=criar_solicitacao_pagamento&"]',
 				doc
 			)
@@ -356,7 +360,7 @@ function obterElementosPagina(doc: Document) {
 				.map(namedProp('linksCriar'))
 		)
 		.concatObj(
-			queryOne<HTMLDivElement>('div#divInfraAreaTelaD', doc).map(
+			queryOneE<HTMLDivElement>('div#divInfraAreaTelaD', doc).map(
 				namedProp('areaTelaD')
 			)
 		);
