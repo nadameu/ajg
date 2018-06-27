@@ -44,6 +44,7 @@
 		"sass-loader": "^6.0.7",
 		"style-loader": "^0.20.3",
 		"ts-jest": "^22.4.2",
+		"ts-loader": "^4.4.1",
 		"ts-node": "^5.0.1",
 		"typescript": "^2.8.1",
 		"userscript-meta": "^1.0.1",
