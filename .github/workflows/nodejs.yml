@@ -1,0 +1,20 @@
+on: push
+name: Main
+jobs:
+  type-check-and-test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Install
+      uses: CultureHQ/actions-yarn@master
+      with:
+        args: install
+    - name: Type check
+      uses: CultureHQ/actions-yarn@master
+      with:
+        args: type-check
+    - name: Test
+      uses: CultureHQ/actions-yarn@master
+      with:
+        args: test
