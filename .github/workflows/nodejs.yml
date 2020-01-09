@@ -5,6 +5,10 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
+    - name: Setup Python
+      uses: actions/setup-python@v1.1.1
+      with:
+        python-version: 2.x
     - uses: actions/checkout@master
     - name: Install
       uses: CultureHQ/actions-yarn@master
